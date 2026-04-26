@@ -113,7 +113,6 @@ def main():
         time.sleep(3)
         sys.exit()
 
-    # Klasor olustur
     safe_show_name = list_page_name.replace("List_of_", "").replace("_episodes", "").replace("_", " ")
     safe_show_name = re.sub(r'[\\/*?:"<>|]', "", safe_show_name)
     if not os.path.exists(safe_show_name):
@@ -129,30 +128,23 @@ def main():
         print(f"\n---> SEZON {season_idx} Isleniyor...")
         ep_idx = 1
 
-        for row in rows[1:]: # Basliklari atla
+        for row in rows[1:]:
             cols = row.find_all(['th', 'td'])
+
+            # Gecerli bir bolum satirinda genellikle birden fazla sutun olur (Bolum no, Isim, Yonetmen vs)
+            # Ozet satirlari (colspan olanlar) genelde tek sutundur. Onlari atlayalim.
+            if len(cols) < 3:
+                continue
 
             ep_title = ""
             for c in cols:
-                # Cogu Fandom wiki'sinde bolum adlari tirnak icindedir. Tirnaklari arayalim.
-                # Eger tirnak yoksa, a_tag'e bakalim ama yonetmenleri (orn Joaquim Dos Santos) ayiklamak icin
-                # c'nin HTML metninde cift tirnak olup olmadigina bakabiliriz.
-
-                # Cogu zaman bolum adi 'title' sutununda (genelde 2. veya 3. sutun) olur.
-                # Bolum adlari genelde <a> tagi icindedir.
                 a_tag = c.find('a')
                 if a_tag:
                     title_text = a_tag.get('title', '')
-                    # Gecersiz baglantilari (sayilar, kategoriler vb) filtrele
                     if title_text and not title_text.isnumeric() and 'Category' not in a_tag.get('href', '') and 'File:' not in a_tag.get('href', ''):
-                        # Fandom listelerinde bolum ismi genellikle td/th icinde tirnak icine alinmistir.
                         text_content = c.get_text()
+                        # Bolum adlarinin yazili oldugu sutunlar neredeyse her zaman tirnak icindedir
                         if '"' in text_content or "“" in text_content or "”" in text_content:
-                            ep_title = title_text
-                            break
-                        # Veya table row sirasiyla ilk yazili metin ise (bazen tirnaksiz olabilir)
-                        # Sadece daha guvenli olmasi acisindan sutunun bold veya sadece link icerdigine bakabiliriz.
-                        if c.find('b') or len(c.get_text(strip=True)) == len(a_tag.get_text(strip=True)):
                             ep_title = title_text
                             break
 
@@ -172,9 +164,9 @@ def main():
 
             if not dialogues:
                 print(f"    -> [Uyari] '{clean_ep_title}' icin transkript metni bulunamadi. Atliyor.")
+                # Eger diyalog bulunamazsa bolum sayacini arttirmayalim (cunku metin yoksa numaralandirmayi bozmasin)
                 continue
 
-            # Dosyaya kaydet
             safe_file_title = re.sub(r'[\\/*?:"<>|]', "", clean_ep_title)
             filename = os.path.join(safe_show_name, f"S{season_idx}_Chapter_{ep_idx}_{safe_file_title}.txt")
 
