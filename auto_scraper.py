@@ -66,12 +66,21 @@ def main():
     print(" FANDOM DIZI/FILM TRANSKRIPT VE GORSEL CEKICI BOT ")
     print("=====================================================")
 
-    url = input("\nLutfen bolum listesi olan sayfanin linkini yapistirin (Orn: https://avatar.fandom.com/wiki/List_of_Avatar:_The_Last_Airbender_episodes): ").strip()
+    print("\nDIKKAT: Yapistiracaginiz link dizinin ANA SAYFASI degil, 'Bolum Listesi (List of episodes)' sayfasi olmalidir!")
+    url = input("Link (Orn: https://avatar.fandom.com/wiki/List_of_Avatar:_The_Last_Airbender_episodes): ").strip()
 
     if not url:
         print("Link bos olamaz, cikis yapiliyor.")
         time.sleep(2)
         sys.exit()
+
+    if "List_of_" not in url and "_episodes" not in url:
+        print("\n[!] UYARI: Girdiginiz link bir 'Bolum Listesi' sayfasina benzemiyor.")
+        print("    Eger sadece dizinin ana sayfasini girdiyseniz (ornegin: /wiki/The_Legend_of_Korra)")
+        print("    bot yanlis tablolari okumaya calisip hata verebilir.")
+        cevap = input("    Yine de devam etmek istiyor musunuz? (E/H): ").strip().lower()
+        if cevap != 'e':
+            sys.exit()
 
     try:
         parsed_url = urllib.parse.urlparse(url)
@@ -110,35 +119,46 @@ def main():
     if not os.path.exists(safe_show_name):
         os.makedirs(safe_show_name)
 
-    # Sezon ve bolumleri bul
     season_idx = 1
     total_episodes_saved = 0
     for table in tables:
         rows = table.find_all('tr')
-        # Skip tables with too few rows (likely not episode lists)
         if len(rows) < 5:
             continue
 
         print(f"\n---> SEZON {season_idx} Isleniyor...")
         ep_idx = 1
 
-        for row in rows[1:]: # Skip header
+        for row in rows[1:]: # Basliklari atla
             cols = row.find_all(['th', 'td'])
 
-            # Find the first link that isn't a number or a category
             ep_title = ""
             for c in cols:
+                # Cogu Fandom wiki'sinde bolum adlari tirnak icindedir. Tirnaklari arayalim.
+                # Eger tirnak yoksa, a_tag'e bakalim ama yonetmenleri (orn Joaquim Dos Santos) ayiklamak icin
+                # c'nin HTML metninde cift tirnak olup olmadigina bakabiliriz.
+
+                # Cogu zaman bolum adi 'title' sutununda (genelde 2. veya 3. sutun) olur.
+                # Bolum adlari genelde <a> tagi icindedir.
                 a_tag = c.find('a')
                 if a_tag:
                     title_text = a_tag.get('title', '')
-                    if title_text and not title_text.isnumeric() and 'Category' not in a_tag.get('href', ''):
-                        ep_title = title_text
-                        break
+                    # Gecersiz baglantilari (sayilar, kategoriler vb) filtrele
+                    if title_text and not title_text.isnumeric() and 'Category' not in a_tag.get('href', '') and 'File:' not in a_tag.get('href', ''):
+                        # Fandom listelerinde bolum ismi genellikle td/th icinde tirnak icine alinmistir.
+                        text_content = c.get_text()
+                        if '"' in text_content or "“" in text_content or "”" in text_content:
+                            ep_title = title_text
+                            break
+                        # Veya table row sirasiyla ilk yazili metin ise (bazen tirnaksiz olabilir)
+                        # Sadece daha guvenli olmasi acisindan sutunun bold veya sadece link icerdigine bakabiliriz.
+                        if c.find('b') or len(c.get_text(strip=True)) == len(a_tag.get_text(strip=True)):
+                            ep_title = title_text
+                            break
 
             if not ep_title:
                 continue
 
-            # Some title cleanups like removing " (episode)"
             clean_ep_title = ep_title.replace(" (episode)", "")
             print(f"  [{season_idx}x{ep_idx}] {clean_ep_title} indiriliyor...")
 
@@ -173,7 +193,7 @@ def main():
 
             ep_idx += 1
             total_episodes_saved += 1
-            time.sleep(0.5) # Sunucuyu yormamak icin bekleme
+            time.sleep(0.5)
 
         season_idx += 1
 
